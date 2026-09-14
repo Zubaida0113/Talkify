@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talkify</title>
+    <meta name="description" content="Voice-Based Automated Task Management Application">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <main class="app">
+
+        <header class="header">
+            <div>
+                <h1>Welcome to Talkify</h1>
+                <p>Voice-Based Automated Task Management Application</p>
+            </div>
+
+            <button id="voiceButton" class="voice-button">
+                Record
+            </button>
+        </header>
+
+
+        <section class="task-input">
+
+            <input
+                type="text"
+                id="taskInput"
+                placeholder="What do you need to do?"
+            >
+
+            <button id="addTaskButton">
+                Add Task
+            </button>
+
+        </section>
+
+
+        <nav class="filters">
+
+            <button class="filter active" data-filter="all">
+                All
+            </button>
+
+            <button class="filter" data-filter="active">
+                Active
+            </button>
+
+            <button class="filter" data-filter="completed">
+                Completed
+            </button>
+
+        </nav>
+
+
+        <section class="tasks-section">
+
+            <h2>Tasks</h2>
+
+            <div id="taskList">
+                <!-- Tasks will appear here -->
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <script src="/static/script.js"></script>
+
+</body>
+</html>
