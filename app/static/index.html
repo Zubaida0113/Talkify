@@ -67,8 +67,37 @@
         </section>
 
     </main>
+    <div id="aiModal" class="modal hidden">
 
+    <div class="modal-content">
 
+        <div class="modal-header">
+            <h2>AI Found These Tasks</h2>
+
+            <button id="closeModal" class="close-button">
+                ✕
+            </button>
+        </div>
+
+        <p id="aiTranscript" class="ai-transcript"></p>
+
+        <div id="aiTaskList"></div>
+
+        <div class="modal-actions">
+
+            <button id="cancelAiTasks" class="cancel-button">
+                Cancel
+            </button>
+
+            <button id="addAiTasks" class="confirm-button">
+                Add All
+            </button>
+
+        </div>
+
+    </div>
+
+    </div>
     <script src="/static/script.js"></script>
 
 </body>

@@ -1,6 +1,15 @@
 const taskInput = document.getElementById("taskInput");
 const addTaskButton = document.getElementById("addTaskButton");
 const taskList = document.getElementById("taskList");
+const aiModal = document.getElementById("aiModal");
+const aiTaskList = document.getElementById("aiTaskList");
+const aiTranscript = document.getElementById("aiTranscript");
+
+const closeModal = document.getElementById("closeModal");
+const cancelAiTasks = document.getElementById("cancelAiTasks");
+const addAiTasks = document.getElementById("addAiTasks");
+
+let extractedTasks = [];
 
 let tasks = [];
 let currentFilter = "all";
@@ -57,7 +66,20 @@ async function startRecording() {
 
         const result = await response.json();
 
-        console.log("Server response:", result);
+console.log("Server response:", result);
+
+if (response.ok) {
+
+    showAiTasks(
+        result.transcript,
+        result.tasks
+    );
+
+} else {
+
+    alert("Failed to process the voice recording.");
+
+}
 
 
     } catch (error) {
@@ -291,3 +313,68 @@ document.querySelectorAll(".filter").forEach(button => {
 
 
 loadTasks();
+
+function showAiTasks(transcript, tasks) {
+
+    extractedTasks = tasks;
+
+    aiTranscript.textContent = `Transcript: "${transcript}"`;
+
+    aiTaskList.innerHTML = "";
+
+    tasks.forEach((task, index) => {
+
+        const taskElement = document.createElement("div");
+
+        taskElement.className = "ai-task";
+
+        taskElement.innerHTML = `
+            <div class="ai-task-title">
+                ${index + 1}. ${task.title}
+            </div>
+
+            <div class="ai-task-details">
+
+                <span>
+                    📅 ${
+                        task.due_date
+                        ? task.due_date
+                        : "No deadline"
+                    }
+                </span>
+
+                <span>
+                    ⭐ ${task.priority}
+                </span>
+
+            </div>
+        `;
+
+        aiTaskList.appendChild(taskElement);
+    });
+
+    aiModal.classList.remove("hidden");
+}
+function closeAiModal() {
+
+    aiModal.classList.add("hidden");
+
+    extractedTasks = [];
+}
+closeModal.addEventListener(
+    "click",
+    closeAiModal
+);
+
+cancelAiTasks.addEventListener(
+    "click",
+    closeAiModal
+);
+addAiTasks.addEventListener("click", () => {
+
+    console.log(
+        "Tasks ready to save:",
+        extractedTasks
+    );
+
+});
