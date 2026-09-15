@@ -17,3 +17,9 @@ class TaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ExtractedTask(BaseModel):
+    title: str
+    description: str | None = None
+    due_date: date | None = None
+    priority: str = "medium"
