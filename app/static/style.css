@@ -216,7 +216,42 @@ input {
 #taskList {
     display: flex;
     flex-direction: column;
+    gap: 24px;
+}
+
+.task-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.task-group h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.task-group-list {
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+}
+
+.task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
+.task-group-urgent h3 {
+    color: #ffb0b0;
 }
 
 .task {
