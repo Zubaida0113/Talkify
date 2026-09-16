@@ -30,6 +30,11 @@
 | **Safety model** | Human approval before AI-generated data is persisted |
 | **Backend** | FastAPI REST API with SQLite and SQLAlchemy |
 
+![Talkify voice task workflow](./app/static/images/Screenshot%202026-09-16%20at%2010.27.22 PM.png)
+![Talkify voice task workflow](./app/static/images/Screenshot%202026-09-16%20at%2010.31.58 PM.png)
+![Talkify voice task workflow](./app/static/images/Screenshot%202026-09-16%20at%2010.34.54 PM.png)
+![Talkify voice task workflow](./app/static/images/Screenshot%202026-09-16%20at%2010.35.17 PM.png)
+
 ## Contents
 
 - [Why Talkify](#why-this-project-stands-out)
