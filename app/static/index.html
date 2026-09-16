@@ -53,6 +53,10 @@
                 Completed
             </button>
 
+            <button class="filter" data-filter="pending">
+                Pending
+            </button>
+
         </nav>
 
 
@@ -67,6 +71,24 @@
         </section>
 
     </main>
+
+    <div id="recordingOverlay" class="recording-overlay hidden" hidden role="dialog" aria-modal="true" aria-labelledby="recordingTitle">
+        <div class="recording-card">
+            <div class="recording-orb" aria-hidden="true">
+                <span class="recording-wave wave-one"></span>
+                <span class="recording-wave wave-two"></span>
+                <span class="recording-mic">🎙</span>
+            </div>
+            <p class="recording-status" id="recordingStatus">Listening...</p>
+            <h2 id="recordingTitle">Tell me what needs doing</h2>
+            <p class="recording-hint" id="recordingHint">Tap Stop when you finish speaking.</p>
+            <div class="recording-actions">
+                <button id="recordingStopButton" class="recording-stop-button" type="button">Stop recording</button>
+                <button id="recordingCancelButton" class="recording-cancel-button" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="aiModal" class="modal hidden">
 
     <div class="modal-content">
@@ -98,7 +120,7 @@
     </div>
 
     </div>
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js" defer></script>
 
 </body>
 </html>

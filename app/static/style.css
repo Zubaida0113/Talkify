@@ -294,13 +294,19 @@ input {
 }
 
 .task.completed {
-    background: linear-gradient(180deg, rgba(52, 211, 153, 0.08), rgba(13, 19, 30, 0.82));
-    border-color: rgba(52, 211, 153, 0.26);
+    background: rgba(92, 102, 120, 0.22);
+    border-color: rgba(148, 163, 184, 0.28);
+    opacity: 0.78;
 }
 
 .task.completed .task-title {
     text-decoration: line-through;
-    color: #b9c4da;
+    color: #a7afbf;
+}
+
+.task.completed .task-meta,
+.task.completed .task-description {
+    color: #8993a6;
 }
 
 .task-actions {
@@ -455,6 +461,131 @@ input {
         background: rgba(255, 255, 255, 0.7);
     }
 }
+/* Recording overlay */
+
+.recording-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(7, 11, 23, 0.58);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.recording-overlay.hidden {
+    display: none;
+}
+
+.recording-overlay[hidden] {
+    display: none !important;
+}
+
+.recording-card {
+    width: min(440px, 100%);
+    padding: 42px 32px 30px;
+    text-align: center;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45), inset 0 1px rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    animation: recordingCardIn 0.3s ease both;
+}
+
+.recording-orb {
+    width: 118px;
+    height: 118px;
+    margin: 0 auto 26px;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--primary), var(--primary-strong) 58%, #26327e);
+    box-shadow: 0 0 0 12px var(--primary-soft), 0 0 44px rgba(124, 140, 255, 0.42);
+}
+
+.recording-mic {
+    position: relative;
+    z-index: 2;
+    font-size: 2.8rem;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.recording-wave {
+    position: absolute;
+    inset: -12px;
+    border: 1px solid rgba(174, 183, 255, 0.65);
+    border-radius: 50%;
+    animation: recordingWave 2s ease-out infinite;
+}
+
+.wave-two {
+    animation-delay: 1s;
+}
+
+.recording-status {
+    color: var(--primary);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.recording-card h2 {
+    font-size: 1.55rem;
+    margin-bottom: 8px;
+}
+
+.recording-hint {
+    color: var(--muted);
+    line-height: 1.5;
+    min-height: 24px;
+}
+
+.recording-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 26px;
+}
+
+.recording-stop-button,
+.recording-cancel-button {
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 17px;
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.recording-stop-button {
+    color: white;
+    background: linear-gradient(135deg, var(--danger) 0%, #d95768 100%);
+}
+
+.recording-cancel-button {
+    color: var(--text);
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+}
+
+@keyframes recordingWave {
+    0% { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(1.35); opacity: 0; }
+}
+
+@keyframes recordingCardIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* AI Confirmation Modal */
 
 .modal {

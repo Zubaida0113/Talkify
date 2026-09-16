@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -8,6 +9,7 @@ from app.routes.tasks import router as task_router
 from app.routes.audio import router as audio_router
 
 app = FastAPI(title="Talkify")
+app.add_middleware(GZipMiddleware, minimum_size=500)
 Base.metadata.create_all(bind=engine) # Create database tables
 app.include_router(task_router) # Task API
 app.include_router(audio_router) # Audio API

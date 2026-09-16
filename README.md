@@ -1,860 +1,357 @@
-# 🎙️ Talkify — AI-Powered Voice Task Manager
+<div align="center">
 
-Talkify is a full-stack voice-enabled task management application that allows users to create and manage tasks using natural voice commands.
+# Talkify
 
-Instead of manually typing a task, users can simply speak it. Talkify converts the voice input into text using **local Whisper**, extracts structured task information such as **title, due date, and priority**, validates the result, and lets the user review the tasks before saving them to the database.
+### Speak naturally. Get tasks you can actually use.
 
-The project combines **Python, FastAPI, speech-to-text, NLP, Pydantic, SQLite, SQLAlchemy, HTML, CSS, and JavaScript** to demonstrate practical AI automation and full-stack development.
+**An AI-powered voice task manager that turns messy speech into organized action.**
 
----
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-REST_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Gemini](https://img.shields.io/badge/Gemini-Structured_AI-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
+[![Whisper](https://img.shields.io/badge/Whisper-Local_STT-412991?logo=openai&logoColor=white)](https://github.com/openai/whisper)
+[![Tests](https://img.shields.io/badge/tests-2_passing-2ea44f)](tests/)
 
-## 🚀 Features
+<br />
 
-### 🎙️ Voice Task Creation
+`Voice input` &nbsp;->&nbsp; `Whisper transcription` &nbsp;->&nbsp; `Gemini reasoning` &nbsp;->&nbsp; `Validated tasks`
 
-Record a voice command directly from the browser.
+</div>
 
-Example:
+<br />
 
-> "I want to update my Aadhaar number tomorrow and go for a driving license renewal on next Tuesday."
+## At a glance
 
-A single voice recording can contain multiple tasks.
+| | |
+| --- | --- |
+| **What it does** | Converts voice notes into reviewable, date-aware tasks |
+| **Core challenge** | Understanding intent without treating every `and` as a new task |
+| **AI layer** | Local Whisper for speech-to-text + Gemini for structured extraction |
+| **Safety model** | Human approval before AI-generated data is persisted |
+| **Backend** | FastAPI REST API with SQLite and SQLAlchemy |
 
----
+## Contents
 
-### 🗣️ Local Speech-to-Text
+- [Why Talkify](#why-this-project-stands-out)
+- [How it works](#how-it-works)
+- [Features](#features)
+- [REST API](#rest-api)
+- [Architecture decisions](#architecture-decisions)
+- [Tech stack](#tech-stack)
+- [Run locally](#run-locally)
+- [Test it](#test-it)
+- [Current status](#current-status)
+- [Roadmap](#roadmap)
 
-Talkify uses **OpenAI Whisper locally** to convert recorded audio into text.
+## Why this project stands out
 
-```text
-Voice Input
-    ↓
-WebM Audio
-    ↓
-Local Whisper
-    ↓
-Transcript
-```
-
-The application currently uses Whisper locally rather than relying on an external speech-to-text API.
-
----
-
-### 🧠 Task Extraction
-
-The transcript is processed using Python-based NLP/rule-based logic to identify individual tasks.
-
-The system extracts:
-
-* Task title
-* Due date
-* Priority
-* Description
-
-For example:
+Most todo apps start with a text box. Talkify starts with how people actually think:
 
 ```text
-Input:
-"I need to update my Aadhaar number tomorrow."
-
-Output:
-Title: Update my Aadhaar number
-Due date: Tomorrow
-Priority: Medium
+"Remind me to send the proposal tomorrow, and make sure I call the client after lunch."
 ```
 
----
+Talkify turns that into a reviewable task preview with:
 
-### 📅 Natural Date Detection
+- Clean, grammatical task titles
+- Context-aware task boundaries
+- ISO due dates from phrases such as `tomorrow` and `next Friday`
+- `low`, `medium`, or `high` priority
+- Optional descriptions
+- Human confirmation before database insertion
 
-Talkify can recognize natural date expressions such as:
+This is a small but complete example of an AI-assisted workflow: unstructured input, model reasoning, schema validation, user review, and durable persistence.
 
-* Today
-* Tomorrow
-* Monday
-* Friday
-* Next Tuesday
+## How it works
 
-These expressions are converted into actual dates using `dateparser`.
-
----
-
-### ⭐ Priority Detection
-
-The system detects priority-related keywords such as:
-
-* Urgent
-* ASAP
-* Important
-* Immediately
-* Critical
-* High priority
-* Low priority
-* No rush
-
-Tasks are assigned:
+### Product flow
 
 ```text
-High
-Medium
-Low
+Browser microphone
+        |
+        v
+WebM audio upload
+        |
+        v
+Local Whisper transcription
+        |
+        v
+Gemini task understanding
+        |
+        v
+Pydantic validation
+        |
+        v
+Human confirmation modal
+        |
+        v
+FastAPI + SQLite
+        |
+        v
+Task dashboard
 ```
 
-Medium is used as the default priority when no priority is specified.
+## Features
 
----
+### 01 / Voice-first task creation
 
-### ✅ Pydantic Validation
+Record a voice note directly in the browser with the MediaRecorder API. A glass recording overlay with an animated microphone gives immediate feedback while the audio is captured. The recording is uploaded to FastAPI and transcribed locally with Whisper as soon as the user stops.
 
-Extracted task data is validated using Pydantic before being stored.
+Talkify also guards the voice pipeline against empty, silent, noisy, or unusable recordings. When no clear speech is detected, the user receives a retry message instead of an empty or misleading task list.
 
-Current task structure:
+### 02 / Gemini-powered extraction
 
-```text
-title
-description
-due_date
-priority
+Gemini acts as the reasoning layer after transcription. It is prompted to return structured JSON containing:
+
+```json
+{
+  "title": "Send the project proposal",
+  "description": "Follow up with the client after sending it.",
+  "due_date": "2026-09-17",
+  "priority": "high"
+}
 ```
 
-This ensures that the extracted data follows a predictable structure.
+The application normalizes and validates model output before it is shown to the user. If Gemini is unavailable, a local heuristic fallback keeps the basic extraction flow usable.
 
----
+### 03 / Human-in-the-loop safety
 
-### 👤 Human-in-the-Loop Confirmation
+AI-generated tasks are previewed in the browser. The user can cancel them or approve them with **Add All**. The model never writes directly to the database.
 
-Talkify does not immediately save AI-generated tasks.
+### 04 / Task management
 
-After processing the voice input, the application displays a confirmation modal:
+- Create tasks manually or by voice
+- View, update, and delete tasks
+- Mark tasks as completed
+- Filter by All, Active, Completed, and Pending
+- See overdue incomplete tasks in Pending
+- Sort by due date, then priority
+- Group tasks into Urgent, Today, Tomorrow, and Later
+- Move tasks naturally between date groups as the calendar changes
+- Show completed tasks with a muted gray visual state
 
-```text
-AI Found These Tasks
+### 05 / Fast browser experience
 
-1. Update my Aadhaar number
-   📅 September 16
-   ⭐ Medium
+- Upload audio immediately after recording stops
+- Defer frontend JavaScript so it does not delay the first render
+- Compress large FastAPI responses with GZip
+- Reuse date-formatting work while rendering task lists
+- Keep the initial layout stable with zero observed Cumulative Layout Shift
 
-2. Driving license renewal
-   📅 September 22
-   ⭐ Medium
+## REST API
 
-        Cancel       Add All
-```
+FastAPI exposes interactive documentation at `/docs` and `/redoc`.
 
-The user can review the extracted tasks and choose whether to add them.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Serve the Talkify dashboard |
+| `POST` | `/audio/upload` | Transcribe audio and extract tasks |
+| `POST` | `/tasks/` | Create a task |
+| `GET` | `/tasks/` | List tasks |
+| `GET` | `/tasks/{task_id}` | Fetch one task |
+| `PUT` | `/tasks/{task_id}` | Update a task |
+| `POST` | `/tasks/{task_id}/complete` | Mark a task complete |
+| `DELETE` | `/tasks/{task_id}` | Delete a task |
 
-This provides a **human-in-the-loop layer** before AI-generated information is persisted.
+## Architecture decisions
 
----
+### Why Whisper locally?
 
-### 🗄️ SQLite Database
+Keeping transcription local avoids adding another hosted speech-to-text dependency and makes the pipeline easier to experiment with. It also gives the project a clear separation between local audio processing and cloud-based language understanding.
 
-Approved tasks are stored in SQLite using SQLAlchemy.
+### Why Gemini?
 
-The application currently supports:
+The task extraction problem is lightweight but context-sensitive. Gemini Flash-Lite is a practical fit for an MVP because it is fast and cost-conscious while still handling grammar, intent, relative dates, and multiple actions in one transcript.
 
-* Create task
-* View all tasks
-* View individual task
-* Update task
-* Delete task
-* Mark task as completed
+### Why validate model output?
 
----
+LLM output is not trusted blindly. The extractor normalizes dates and priorities, then Pydantic validates the final task shape before the API returns it. This keeps the probabilistic part of the system behind a predictable application boundary.
 
-### 📝 Manual Task Creation
+### Why guard the audio pipeline?
 
-Users can also create tasks manually through the normal Todo interface without using voice input.
+Speech recognition can return empty text or low-confidence noise when a microphone captures silence, background sounds, or an unclear recording. Talkify checks Whisper output before invoking Gemini, which avoids unnecessary API calls, reduces confusing results, and gives the user a clear recovery path.
 
----
+### Why optimize the browser path?
 
-### 🔍 Task Filtering
+The dashboard is designed to feel immediate even though voice processing involves local transcription and a network request. Deferred JavaScript, GZip responses, and reusable date formatting reduce initial render work and transfer size without changing the product flow.
 
-Tasks can currently be filtered by:
+## Tech stack
 
-* All
-* Active
-* Completed
+**Backend**
 
----
+- Python 3.11+
+- FastAPI and Uvicorn
+- SQLAlchemy with SQLite
+- Pydantic
 
-### 📊 Intelligent Task Ordering
+**AI and language processing**
 
-Tasks are being organized based on their urgency.
+- OpenAI Whisper for local transcription
+- Gemini API through the supported `google-genai` SDK
+- `dateparser` for fallback date handling
 
-The planned ordering logic is:
+**Frontend**
 
-```text
-Primary → Due Date
-Secondary → Priority
-```
+- HTML and CSS
+- Vanilla JavaScript
+- MediaRecorder API
+- Fetch API
 
-Tasks with the closest upcoming due date appear first.
+**Quality and tooling**
 
-For tasks with the same due date:
+- Pytest
+- GitHub Codespaces
+- FFmpeg
 
-```text
-High
-  ↓
-Medium
-  ↓
-Low
-```
-
-This allows the application to naturally prioritize tasks that need attention first.
-
----
-
-# 🏗️ Architecture
-
-```text
-                    🎙️ Voice Input
-                          │
-                          ▼
-                 Browser MediaRecorder
-                          │
-                          ▼
-                     WebM Audio
-                          │
-                          ▼
-                 Local Whisper STT
-                          │
-                          ▼
-                    Transcript
-                          │
-                          ▼
-              Python Task Extraction
-                          │
-                ┌─────────┴─────────┐
-                ▼                   ▼
-            Due Date            Priority
-                │                   │
-                └─────────┬─────────┘
-                          ▼
-                  Pydantic Validation
-                          │
-                          ▼
-                👤 User Confirmation
-                          │
-                          ▼
-                    FastAPI API
-                          │
-                          ▼
-                  SQLite Database
-                          │
-                          ▼
-                    Todo Dashboard
-```
-
----
-
-# 🛠️ Tech Stack
-
-## Backend
-
-* Python
-* FastAPI
-* SQLAlchemy
-* SQLite
-* Pydantic
-
-## AI / NLP
-
-* OpenAI Whisper
-* `dateparser`
-* Python-based rule extraction
-
-## Frontend
-
-* HTML
-* CSS
-* JavaScript
-* MediaRecorder API
-* Fetch API
-
-## Development Tools
-
-* Git
-* GitHub
-* GitHub Codespaces
-* FFmpeg
-* Pytest
-
----
-
-# 📁 Project Structure
+## Project structure
 
 ```text
 Talkify/
-│
 ├── app/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── database.py
-│   │
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── task.py
-│   │
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   └── task.py
-│   │
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── task_service.py
-│   │   ├── transcription.py
-│   │   └── task_extractor.py
-│   │
+│   ├── main.py                 # FastAPI application and dashboard route
+│   ├── database.py             # SQLAlchemy engine and sessions
+│   ├── models/task.py          # Database model
+│   ├── schemas/task.py         # Pydantic request/response schemas
 │   ├── routes/
-│   │   ├── __init__.py
-│   │   ├── tasks.py
-│   │   └── audio.py
-│   │
+│   │   ├── tasks.py            # Task CRUD and completion endpoints
+│   │   └── audio.py            # Audio upload and AI extraction endpoint
+│   ├── services/
+│   │   ├── transcription.py    # Local Whisper transcription
+│   │   ├── task_extractor.py   # Gemini parsing and fallback logic
+│   │   └── task_service.py     # Task-related service layer
 │   └── static/
-│       ├── index.html
-│       ├── style.css
-│       └── script.js
-│
+│       ├── index.html          # Dashboard markup
+│       ├── script.js           # Browser interaction and filters
+│       └── style.css           # Dashboard styling
 ├── tests/
-│
-├── uploads/
-│
+├── uploads/                    # Temporary audio files
 ├── requirements.txt
-├── .env
-├── .gitignore
 └── README.md
 ```
 
----
+## Run locally
 
-# 🔄 Application Flow
-
-### Normal Task
-
-```text
-User enters task
-       ↓
-FastAPI
-       ↓
-Pydantic Validation
-       ↓
-SQLite
-       ↓
-Task Dashboard
-```
-
-### Voice Task
-
-```text
-User speaks
-       ↓
-Browser records audio
-       ↓
-Audio uploaded to FastAPI
-       ↓
-Whisper generates transcript
-       ↓
-Task extractor identifies tasks
-       ↓
-Due date + priority extracted
-       ↓
-Pydantic validates output
-       ↓
-User reviews AI-generated tasks
-       ↓
-User clicks "Add All"
-       ↓
-Tasks saved to SQLite
-       ↓
-Dashboard refreshed
-```
-
----
-
-# 🧪 Example
-
-### Voice Input
-
-```text
-"I want to update my Aadhaar number tomorrow
-and go for a driving license renewal on next Tuesday."
-```
-
-### Whisper Transcript
-
-```text
-I want to update my Aadhaar number tomorrow
-and go for a driving license renewal on next Tuesday.
-```
-
-### Extracted Tasks
-
-```json
-[
-  {
-    "title": "update my Aadhaar number",
-    "description": null,
-    "due_date": "2026-09-16",
-    "priority": "medium"
-  },
-  {
-    "title": "go for a driving license renewal",
-    "description": null,
-    "due_date": "2026-09-22",
-    "priority": "medium"
-  }
-]
-```
-
-### User Confirmation
-
-The extracted tasks are shown to the user before they are added to the database.
-
----
-
-# 🔮 Future Enhancements
-
-## 🤖 LLM-Based Post-Processing
-
-A future version will introduce an LLM after Whisper:
-
-```text
-Voice
-  ↓
-Whisper
-  ↓
-Raw Transcript
-  ↓
-LLM
-  ↓
-Corrected + Structured Tasks
-  ↓
-Pydantic Validation
-  ↓
-Human Confirmation
-  ↓
-SQLite
-```
-
-The LLM will help with:
-
-* Noisy or inaccurate transcripts
-* Accent-related transcription errors
-* Context understanding
-* Better task titles
-* Natural language date interpretation
-* Priority inference
-* Multiple tasks in complex sentences
-* Removing unnecessary words
-* Ambiguous user instructions
-
-For example:
-
-```text
-Whisper:
-"update my Adharkar number"
-
-        ↓
-
-LLM:
-"Update my Aadhaar number"
-```
-
-The LLM will act as a **post-processing and reasoning layer**, while Whisper remains responsible for speech-to-text.
-
----
-
-## 🧪 Testing
-
-Planned improvements include automated tests for:
-
-* Task extraction
-* Date detection
-* Priority detection
-* Pydantic validation
-* API endpoints
-* Database operations
-* Voice-processing pipeline
-
----
-
-# 🎯 Project Goals
-
-Talkify is being developed to demonstrate practical experience with:
-
-* Python
-* FastAPI
-* REST APIs
-* Full-stack development
-* SQL databases
-* SQLAlchemy
-* Pydantic
-* Speech-to-text AI
-* NLP
-* AI automation
-* Structured AI outputs
-* Human-in-the-loop systems
-* API integration
-* Error handling
-* Testing
-
----
-
-# 📌 Current Status
-
-### Completed ✅
-
-* [x] FastAPI backend
-* [x] SQLite database
-* [x] SQLAlchemy models
-* [x] Pydantic schemas
-* [x] CRUD task APIs
-* [x] Manual task creation
-* [x] Task completion
-* [x] Task deletion
-* [x] Task filtering
-* [x] Browser voice recording
-* [x] WebM audio upload
-* [x] Local Whisper transcription
-* [x] Natural date extraction
-* [x] Priority extraction
-* [x] Multiple task extraction from one voice command
-* [x] Pydantic validation of extracted tasks
-* [x] AI task confirmation modal
-* [x] Human approval before database insertion
-* [x] Saving extracted tasks to SQLite
-* [x] Refreshing the Todo dashboard after voice task creation
-
-### In Progress 🚧
-
-* [ ] Due-date + priority display on task cards
-* [ ] Automatic task ordering by due date
-* [ ] Priority ordering for tasks with the same due date
-* [ ] Improved natural-language extraction
-
-### Planned 🔮
-
-* [ ] LLM-based transcript correction
-* [ ] LLM-based structured task extraction
-* [ ] Better handling of accents and noisy speech
-* [ ] Improved natural-language understanding
-* [ ] Automated tests
-* [ ] Production-oriented error handling
-* [ ] Final documentation and deployment
-
----
-
-# 👩‍💻 Project Motivation
-
-Talkify was built to explore how **AI can automate everyday productivity workflows** rather than simply acting as a chatbot.
-
-The project focuses on a practical pipeline where AI takes unstructured human input — **voice** — and converts it into structured, validated, user-approved actions that can be persisted and managed by a traditional software system.
-
-This makes Talkify a combination of:
-
-**AI + Automation + Backend Engineering + Full-Stack Development.**
-
-# ⚙️ Setup & Run
-
-## 1. Clone the Repository
+### 1. Clone and create an environment
 
 ```bash
 git clone <your-repository-url>
 cd Talkify
-```
-
-If you are using **GitHub Codespaces**, you can open the repository directly in a Codespace instead.
-
----
-
-## 2. Create a Virtual Environment
-
-Create a Python virtual environment:
-
-```bash
 python3 -m venv venv
-```
-
-Activate it:
-
-### macOS / Linux
-
-```bash
 source venv/bin/activate
 ```
 
-### Windows
+On Windows:
 
-```bash
+```powershell
 venv\Scripts\activate
 ```
 
----
-
-## 3. Install Dependencies
-
-Install the required Python packages:
+### 2. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-The project uses packages including:
-
-* FastAPI
-* Uvicorn
-* SQLAlchemy
-* Pydantic
-* `openai-whisper`
-* `dateparser`
-* `python-multipart`
-* Pytest
-
----
-
-## 4. Install FFmpeg
-
-Whisper requires **FFmpeg** to process audio formats such as WebM.
-
-### macOS
-
-If you use Homebrew:
+Whisper requires FFmpeg:
 
 ```bash
+# Ubuntu / GitHub Codespaces
+sudo apt update && sudo apt install ffmpeg
+
+# macOS
 brew install ffmpeg
 ```
 
-Verify the installation:
+### 3. Configure Gemini
 
-```bash
-ffmpeg -version
+Create a `.env` file in the project root:
+
+```dotenv
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-### Ubuntu / GitHub Codespaces
+Create a key in [Google AI Studio](https://aistudio.google.com/). Keep `.env` private and never commit the key.
 
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
+### 4. Start the application
 
-Verify:
-
-```bash
-ffmpeg -version
-```
-
-> FFmpeg must be available in your system PATH for Whisper to process uploaded audio.
-
----
-
-## 5. Create the Upload Directory
-
-The application stores temporary voice recordings in the `uploads` directory.
-
-```bash
-mkdir -p uploads
-```
-
-The directory is automatically created by the application if it does not already exist, but creating it manually is also fine.
-
----
-
-## 6. Start the FastAPI Server
-
-Run:
+For local development:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-You should see something similar to:
-
-```text
-Uvicorn running on http://127.0.0.1:8000
-```
-
----
-
-## 7. Open Talkify
-
-Open the application in your browser:
-
-```text
-http://127.0.0.1:8000
-```
-
-If you are using **GitHub Codespaces**, open the forwarded port from the **Ports** panel and launch the application using the generated URL.
-
----
-
-## 8. Test the API
-
-FastAPI automatically provides interactive API documentation.
-
-Open:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-From Swagger UI you can test endpoints such as:
-
-```text
-POST /tasks/
-GET  /tasks/
-GET  /tasks/{task_id}
-PUT  /tasks/{task_id}
-DELETE /tasks/{task_id}
-POST /tasks/{task_id}/complete
-POST /audio/upload
-```
-
----
-
-## 9. Test Voice Task Creation
-
-Open the Talkify dashboard and click:
-
-```text
-🎙️ Record
-```
-
-Speak a command such as:
-
-> "I want to update my Aadhaar number tomorrow and call my friend on Friday."
-
-Click **Stop**.
-
-The application will:
-
-```text
-Voice Recording
-      ↓
-Audio Upload
-      ↓
-Whisper Transcription
-      ↓
-Task Extraction
-      ↓
-Due Date + Priority Detection
-      ↓
-Pydantic Validation
-      ↓
-AI Confirmation Modal
-```
-
-Review the extracted tasks and click:
-
-```text
-Add All
-```
-
-The tasks will then be saved to the SQLite database and displayed in the Todo list.
-
----
-
-## 🔐 Environment Variables
-
-The current version of Talkify uses **local Whisper** and does not require an OpenAI API key for speech-to-text.
-
-If API keys or other environment-specific configuration are added in future versions, they should be stored in a `.env` file and excluded from Git using `.gitignore`.
-
-Example:
-
-```text
-.env
-```
-
----
-
-## 🗄️ Database
-
-Talkify uses SQLite.
-
-The database file is created automatically when the application starts:
-
-```text
-voicetask.db
-```
-
-The database contains the application's task records.
-
-No separate database server is required for local development.
-
----
-
-## 🛑 Stop the Server
-
-To stop the FastAPI development server:
-
-```text
-Ctrl + C
-```
-
----
-
-## 🔄 Development Workflow
-
-For development, the recommended workflow is:
+For GitHub Codespaces, bind to all interfaces so the forwarded port is reachable:
 
 ```bash
-source venv/bin/activate
-
-pip install -r requirements.txt
-
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Then open:
 
-```text
-http://127.0.0.1:8000
+- Dashboard: `http://127.0.0.1:8000/`
+- API docs: `http://127.0.0.1:8000/docs`
+
+In Codespaces, open port `8000` from the Ports panel.
+
+## Test it
+
+Run the focused extractor tests:
+
+```bash
+source venv/bin/activate
+pytest tests/test_extractor.py -q
 ```
 
-Changes to the Python backend will automatically reload because the server is running with `--reload`.
+To test a real Gemini request without printing the API key:
 
-
-# Extra Notes
-```python
-routes/       → receives HTTP requests
-services/     → application logic / AI logic
-schemas/      → defines valid input/output
-models/       → database structure
-tests/        → tests
-main.py       → starts the application
+```bash
+python -c "from app.services.task_extractor import call_llm_task_parser; print(call_llm_task_parser('Send the report tomorrow with high priority'))"
 ```
-This is what task looks like in our database.
-```python
-Task
-│
-├── id
-├── title
-├── description
-├── due_date
-├── priority
-└── completed
-```
->**create_engine**: Manages the actual connection bridge between Python and your database (like SQLite or PostgreSQL). It handles the low-level communication and maintains a pool of reusable connections to keep the app fast.
 
->**sessionmaker**: Acts as a factory that generates Session objects. A session is your workspace for database queries—it tracks changes, lets you add or delete items, and commits those changes to the database when you are done.
+## What I learned building Talkify
 
-Once you build the engine and session, your app can:
+Talkify sits at the boundary between flexible human language and strict software contracts. The most valuable engineering challenge was not calling an LLM; it was designing the boundary around it:
 
-- Create tables
-- Insert tasks
-- Read tasks
-- Update tasks
-- Delete tasks
+1. Keep transcription and reasoning as separate services.
+2. Ask the model for a constrained JSON shape.
+3. Normalize dates and priority values after the model responds.
+4. Validate with Pydantic before data reaches the API or database.
+5. Put a human confirmation step between AI output and persistence.
+6. Keep a fallback path for missing keys, quota errors, or model failures.
 
-Tasks are grouped into:
-- Today
-- Tomorrow
-- Later
-- Urgent
-```python
-High-priority tasks appear under Urgent.
-Tasks without dates appear under Later.
-Each section shows its task count.
-Existing All, Active, and Completed filters still work.
-```
+That pattern generalizes well beyond task management: customer support triage, meeting action items, CRM updates, and any workflow that converts messy human input into structured records.
+
+## Current status
+
+- FastAPI REST API is implemented
+- SQLite persistence is implemented
+- Local Whisper transcription is implemented
+- Gemini structured task extraction is implemented
+- Relative date and priority inference is implemented
+- Human approval before persistence is implemented
+- Manual and voice-based task creation are implemented
+- Recording overlay with animated microphone feedback is implemented
+- Empty and noisy voice guardrails with retry messaging are implemented
+- Immediate post-recording upload is implemented
+- Pending overdue-task filter is implemented
+- Urgent category is displayed before all other task groups
+- GZip response compression and deferred frontend loading are implemented
+- Extractor regression tests are implemented
+
+## Roadmap
+
+- Add authentication and user-specific task lists
+- Store audio-processing status and error details
+- Add richer task editing from the dashboard
+- Add integration tests for the complete audio pipeline
+- Add background processing for longer recordings
+- Deploy the API and frontend as a production service
+
+## License
+
+This project is currently intended as a portfolio and learning project. Add a license before distributing it as a reusable library or service.
+
+---
+
+Built to explore a practical question: **what if your todo list could understand you before asking you to format your thoughts?**

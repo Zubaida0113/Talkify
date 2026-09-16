@@ -7,6 +7,11 @@ const aiTranscript = document.getElementById("aiTranscript");
 const closeModal = document.getElementById("closeModal");
 const cancelAiTasks = document.getElementById("cancelAiTasks");
 const addAiTasks = document.getElementById("addAiTasks");
+const recordingOverlay = document.getElementById("recordingOverlay");
+const recordingStatus = document.getElementById("recordingStatus");
+const recordingHint = document.getElementById("recordingHint");
+const recordingStopButton = document.getElementById("recordingStopButton");
+const recordingCancelButton = document.getElementById("recordingCancelButton");
 
 let tasks = [];
 let extractedTasks = [];
@@ -15,10 +20,22 @@ let currentFilter = "all";
 let mediaRecorder;
 let audioChunks = [];
 let isRecording = false;
+let recordingCancelled = false;
 
 const voiceButton = document.getElementById("voiceButton");
+const taskDateFormatter = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+});
 
 async function startRecording() {
+
+    recordingCancelled = false;
+    recordingOverlay.hidden = false;
+    recordingOverlay.classList.remove("hidden");
+    recordingStatus.textContent = "Listening...";
+    recordingHint.textContent = "Allow microphone access, then start speaking.";
 
     try {
 
@@ -27,7 +44,6 @@ async function startRecording() {
         });
 
         mediaRecorder = new MediaRecorder(stream);
-
         audioChunks = [];
 
         mediaRecorder.ondataavailable = (event) => {
@@ -44,6 +60,11 @@ async function startRecording() {
     console.log("Recording complete");
     console.log("Audio size:", audioBlob.size);
 
+
+    if (recordingCancelled) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+    }
 
     const formData = new FormData();
 
@@ -67,6 +88,9 @@ async function startRecording() {
         console.log("Server response:", result);
 
         if (!response.ok) {
+            if (response.status === 422) {
+                throw new Error("I could not hear a clear task. Please record your voice again.");
+            }
             throw new Error(result.detail || "Failed to process the recording.");
         }
 
@@ -76,7 +100,7 @@ async function startRecording() {
     } catch (error) {
 
         console.error("Audio upload failed:", error);
-        alert(`Audio upload failed: ${error.message}`);
+        alert(error.message);
 
     }
 
@@ -84,12 +108,15 @@ async function startRecording() {
     stream.getTracks().forEach(
         track => track.stop()
     );
+    closeRecordingOverlay();
 };
 
 
         mediaRecorder.start();
 
         isRecording = true;
+        recordingStatus.textContent = "Listening...";
+        recordingHint.textContent = "Tap Stop when you finish speaking.";
 
         voiceButton.textContent = "⏹️ Stop";
 
@@ -100,6 +127,8 @@ async function startRecording() {
     } catch (error) {
 
         console.error("Microphone error:", error);
+
+        closeRecordingOverlay();
 
         alert(
             "Microphone access is required to record a voice task."
@@ -113,6 +142,7 @@ function stopRecording() {
     if (mediaRecorder && isRecording) {
 
         mediaRecorder.stop();
+        closeRecordingOverlay();
 
         isRecording = false;
 
@@ -121,6 +151,22 @@ function stopRecording() {
         voiceButton.classList.remove("recording");
 
     }
+}
+
+function closeRecordingOverlay() {
+    recordingOverlay.hidden = true;
+    recordingOverlay.classList.add("hidden");
+}
+
+function cancelRecording() {
+    recordingCancelled = true;
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+    }
+    isRecording = false;
+    voiceButton.textContent = "🎙️ Record";
+    voiceButton.classList.remove("recording");
+    closeRecordingOverlay();
 }
 
 voiceButton.addEventListener("click", () => {
@@ -137,6 +183,9 @@ voiceButton.addEventListener("click", () => {
 
 });
 
+recordingStopButton.addEventListener("click", stopRecording);
+recordingCancelButton.addEventListener("click", cancelRecording);
+
 
 async function loadTasks() {
     const response = await fetch("/tasks/");
@@ -152,10 +201,10 @@ const priorityOrder = {
 };
 
 const taskGroups = [
+    { key: "urgent", label: "Urgent" },
     { key: "today", label: "Today" },
     { key: "tomorrow", label: "Tomorrow" },
-    { key: "later", label: "Later" },
-    { key: "urgent", label: "Urgent" }
+    { key: "later", label: "Later" }
 ];
 
 function parseTaskDate(dateValue) {
@@ -174,15 +223,23 @@ function formatTaskDate(dateValue) {
         return "No deadline";
     }
 
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-    }).format(date);
+    return taskDateFormatter.format(date);
 }
 
 function getDateKey(date) {
     return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function isPendingTask(task) {
+    if (task.completed || !task.due_date) {
+        return false;
+    }
+
+    const taskDate = parseTaskDate(task.due_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return taskDate < today;
 }
 
 function getTaskGroup(task) {
@@ -223,6 +280,10 @@ function renderTasks() {
 
     if (currentFilter === "completed") {
         filteredTasks = filteredTasks.filter(task => task.completed);
+    }
+
+    if (currentFilter === "pending") {
+        filteredTasks = filteredTasks.filter(isPendingTask);
     }
 
     filteredTasks.sort((a, b) => {

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pathlib import Path
 
-from app.services.transcription import transcribe_audio
+from app.services.transcription import is_usable_transcript, transcribe_audio
 from app.services.task_extractor import extract_tasks, validate_tasks
 
 router = APIRouter(
@@ -27,6 +27,12 @@ async def upload_audio(file: UploadFile = File(...)):
 
     # 2. Transcribe audio using Whisper
     transcript = transcribe_audio(str(file_path))
+
+    if not is_usable_transcript(transcript):
+        raise HTTPException(
+            status_code=422,
+            detail="No clear speech was detected. Please record your task again.",
+        )
 
     # 3. Extract tasks from transcript
     extracted_tasks = extract_tasks(transcript)
