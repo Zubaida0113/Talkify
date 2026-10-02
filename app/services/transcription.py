@@ -48,7 +48,7 @@ def transcribe_audio(file_path: str) -> str:
             while data := audio_file.readframes(4000):
                 recognizer.AcceptWaveform(data)
 
-        result = json.loads(recognizer.Final())
+        result = json.loads(recognizer.FinalResult())
         return result.get("text", "").strip()
     finally:
         os.unlink(wav_path)
