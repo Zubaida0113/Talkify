@@ -288,6 +288,17 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 
 Create a key in [Google AI Studio](https://aistudio.google.com/). Keep `.env` private and never commit the key.
 
+### Run with Docker
+
+Build the image and run it locally. The image installs FFmpeg and downloads the Vosk model during the build.
+
+```bash
+docker build -t talkify .
+docker run --rm --name talkify -p 8000:8000 --env-file .env talkify
+```
+
+Open `http://localhost:8000`. The container defaults to port `8000`; Render's `PORT` setting overrides it.
+
 ### 4. Start the application
 
 For local development:

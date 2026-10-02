@@ -7,6 +7,8 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+ENV PORT=8000
+
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

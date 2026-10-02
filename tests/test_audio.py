@@ -38,6 +38,11 @@ def test_process_transcript_rejects_unusable_speech():
     assert error.value.status_code == 422
 
 
+def test_transcript_quality_accepts_clear_single_word_and_rejects_noise():
+    assert transcription.is_usable_transcript("Call")
+    assert not transcription.is_usable_transcript("hmm")
+
+
 def test_transcribe_audio_reads_vosk_final_result(monkeypatch, tmp_path):
     class FakeRecognizer:
         def __init__(self, model, sample_rate):

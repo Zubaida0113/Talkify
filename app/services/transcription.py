@@ -57,7 +57,7 @@ def transcribe_audio(file_path: str) -> str:
 def is_usable_transcript(transcript: str) -> bool:
     """Reject empty, noise-like, and unusably short speech transcripts."""
     words = re.findall(r"[A-Za-z]{2,}", transcript or "")
-    if len(words) < 2:
+    if not words:
         return False
 
     letters = "".join(words).lower()
