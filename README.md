@@ -9,12 +9,12 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-REST_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-Structured_AI-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
-[![Whisper](https://img.shields.io/badge/Whisper-Local_STT-412991?logo=openai&logoColor=white)](https://github.com/openai/whisper)
+[![Speech](https://img.shields.io/badge/Speech-Web_API_%2B_Vosk-168A72)](https://alphacephei.com/vosk/)
 [![Tests](https://img.shields.io/badge/tests-2_passing-2ea44f)](tests/)
 
 <br />
 
-`Voice input` &nbsp;->&nbsp; `Whisper transcription` &nbsp;->&nbsp; `Gemini reasoning` &nbsp;->&nbsp; `Validated tasks`
+`Browser speech recognition` &nbsp;->&nbsp; `Gemini reasoning` &nbsp;->&nbsp; `Validated tasks`
 
 </div>
 
@@ -26,7 +26,7 @@
 | --- | --- |
 | **What it does** | Converts voice notes into reviewable, date-aware tasks |
 | **Core challenge** | Understanding intent without treating every `and` as a new task |
-| **AI layer** | Local Whisper for speech-to-text + Gemini for structured extraction |
+| **AI layer** | Browser speech recognition, Vosk audio fallback, and Gemini task extraction |
 | **Safety model** | Human approval before AI-generated data is persisted |
 | **Backend** | FastAPI REST API with SQLite and SQLAlchemy |
 
@@ -75,15 +75,14 @@ This is a small but complete example of an AI-assisted workflow: unstructured in
 Browser microphone
         |
         v
-WebM audio upload
-        |
-        v
-Local Whisper transcription
-        |
-        v
-Gemini task understanding
-        |
-        v
+Web microphone --> Web Speech API --> /audio/transcript --+
+       |                                                  |
+       +--> fallback WebM --> FFmpeg --> Vosk ------------+
+                                                          |
+                                                          v
+                                              Gemini task understanding
+                                                          |
+                                                          v
 Pydantic validation
         |
         v
@@ -100,7 +99,9 @@ Task dashboard
 
 ### 01 / Voice-first task creation
 
-Record a voice note directly in the browser with the MediaRecorder API. A glass recording overlay with an animated microphone gives immediate feedback while the audio is captured. The recording is uploaded to FastAPI and transcribed locally with Whisper as soon as the user stops.
+Talkify uses the browser Web Speech API first and sends recognized text to FastAPI for task extraction. When that API is unavailable or cannot recognize speech, MediaRecorder uploads audio for local Vosk transcription. FFmpeg converts browser WebM audio to the 16 kHz mono PCM format Vosk expects.
+
+Web Speech API availability and processing behavior depend on the browser; some browsers may use a remote speech service. The audio-upload fallback is processed by Talkify locally.
 
 Talkify also guards the voice pipeline against empty, silent, noisy, or unusable recordings. When no clear speech is detected, the user receives a retry message instead of an empty or misleading task list.
 
@@ -150,7 +151,8 @@ FastAPI exposes interactive documentation at `/docs` and `/redoc`.
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/` | Serve the Talkify dashboard |
-| `POST` | `/audio/upload` | Transcribe audio and extract tasks |
+| `POST` | `/audio/transcript` | Extract tasks from a browser-recognized transcript |
+| `POST` | `/audio/upload` | Transcribe fallback audio with Vosk and extract tasks |
 | `POST` | `/tasks/` | Create a task |
 | `GET` | `/tasks/` | List tasks |
 | `GET` | `/tasks/{task_id}` | Fetch one task |
@@ -160,9 +162,9 @@ FastAPI exposes interactive documentation at `/docs` and `/redoc`.
 
 ## Architecture decisions
 
-### Why Whisper locally?
+### Why browser speech recognition first?
 
-Keeping transcription local avoids adding another hosted speech-to-text dependency and makes the pipeline easier to experiment with. It also gives the project a clear separation between local audio processing and cloud-based language understanding.
+Browser recognition avoids loading a speech model for the common path, keeping backend startup fast and reducing runtime memory. Vosk remains a local fallback for browsers that cannot provide a transcript; its model is loaded only when an uploaded recording needs transcription.
 
 ### Why Gemini?
 
@@ -174,7 +176,7 @@ LLM output is not trusted blindly. The extractor normalizes dates and priorities
 
 ### Why guard the audio pipeline?
 
-Speech recognition can return empty text or low-confidence noise when a microphone captures silence, background sounds, or an unclear recording. Talkify checks Whisper output before invoking Gemini, which avoids unnecessary API calls, reduces confusing results, and gives the user a clear recovery path.
+Speech recognition can return empty text or low-confidence noise when a microphone captures silence, background sounds, or an unclear recording. Talkify checks both browser transcripts and Vosk output before invoking Gemini, which avoids unnecessary API calls and gives the user a clear recovery path.
 
 ### Why optimize the browser path?
 
@@ -191,7 +193,8 @@ The dashboard is designed to feel immediate even though voice processing involve
 
 **AI and language processing**
 
-- OpenAI Whisper for local transcription
+- Browser Web Speech API for primary transcription
+- Vosk for local audio-upload fallback
 - Gemini API through the supported `google-genai` SDK
 - `dateparser` for fallback date handling
 
@@ -221,7 +224,7 @@ Talkify/
 │   │   ├── tasks.py            # Task CRUD and completion endpoints
 │   │   └── audio.py            # Audio upload and AI extraction endpoint
 │   ├── services/
-│   │   ├── transcription.py    # Local Whisper transcription
+│   │   ├── transcription.py    # Lazy Vosk transcription fallback
 │   │   ├── task_extractor.py   # Gemini parsing and fallback logic
 │   │   └── task_service.py     # Task-related service layer
 │   └── static/
@@ -257,7 +260,7 @@ venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-Whisper requires FFmpeg:
+FFmpeg is required only for the uploaded-audio fallback. Vosk loads its speech model only when that fallback is used. Install FFmpeg and download the small English model:
 
 ```bash
 # Ubuntu / GitHub Codespaces
@@ -265,7 +268,14 @@ sudo apt update && sudo apt install ffmpeg
 
 # macOS
 brew install ffmpeg
+
+# From the project root
+mkdir -p models
+curl -L https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip -o /tmp/vosk-model.zip
+unzip /tmp/vosk-model.zip -d models
 ```
+
+The default model path is `models/vosk-model-small-en-us-0.15`. Set `VOSK_MODEL_PATH` if you install it elsewhere. Browser speech recognition is most consistently available in Chromium-based browsers and requires a secure context (HTTPS or localhost).
 
 ### 3. Configure Gemini
 
@@ -301,11 +311,11 @@ In Codespaces, open port `8000` from the Ports panel.
 
 ## Test it
 
-Run the focused extractor tests:
+Run the test suite:
 
 ```bash
 source venv/bin/activate
-pytest tests/test_extractor.py -q
+pytest -q
 ```
 
 To test a real Gemini request without printing the API key:
@@ -331,7 +341,7 @@ That pattern generalizes well beyond task management: customer support triage, m
 
 - FastAPI REST API is implemented
 - SQLite persistence is implemented
-- Local Whisper transcription is implemented
+- Browser-first transcription and lazy Vosk audio fallback are implemented
 - Gemini structured task extraction is implemented
 - Relative date and priority inference is implemented
 - Human approval before persistence is implemented

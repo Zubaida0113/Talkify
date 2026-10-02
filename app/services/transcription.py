@@ -1,34 +1,61 @@
+import json
+import os
 import re
+import subprocess
+import tempfile
+import wave
 
-import whisper
+from vosk import KaldiRecognizer, Model
 
-# Load the Whisper model once when the application starts
-model = whisper.load_model("base")
+VOSK_MODEL_PATH = os.environ.get("VOSK_MODEL_PATH", "models/vosk-model-small-en-us-0.15")
+_model = None
+
+
+def get_vosk_model():
+    global _model
+
+    if _model is None:
+        if not os.path.exists(VOSK_MODEL_PATH):
+            raise RuntimeError(
+                "Vosk model not found. Set VOSK_MODEL_PATH or download the model to "
+                f"{VOSK_MODEL_PATH}."
+            )
+        _model = Model(VOSK_MODEL_PATH)
+
+    return _model
 
 
 def transcribe_audio(file_path: str) -> str:
     """
-    Transcribe an audio file using local Whisper.
+    Transcribe audio with Vosk after converting it to 16 kHz mono PCM WAV.
     """
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav_file:
+        wav_path = wav_file.name
 
-    result = model.transcribe(file_path)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-nostdin", "-y", "-i", file_path, "-vn",
+                "-ac", "1", "-ar", "16000", "-sample_fmt", "s16", wav_path,
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
 
-    segments = result.get("segments", [])
-    speech_segments = [
-        segment
-        for segment in segments
-        if segment.get("no_speech_prob", 1) < 0.75
-        and segment.get("avg_logprob", -10) > -2.0
-    ]
+        recognizer = KaldiRecognizer(get_vosk_model(), 16000)
+        with wave.open(wav_path, "rb") as audio_file:
+            while data := audio_file.readframes(4000):
+                recognizer.AcceptWaveform(data)
 
-    if segments and not speech_segments:
-        return ""
-
-    return result["text"].strip()
+        result = json.loads(recognizer.Final())
+        return result.get("text", "").strip()
+    finally:
+        os.unlink(wav_path)
 
 
 def is_usable_transcript(transcript: str) -> bool:
-    """Reject empty, noise-like, and unusably short Whisper output."""
+    """Reject empty, noise-like, and unusably short speech transcripts."""
     words = re.findall(r"[A-Za-z]{2,}", transcript or "")
     if len(words) < 2:
         return False

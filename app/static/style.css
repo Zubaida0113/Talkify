@@ -250,6 +250,18 @@ input {
     font-size: 0.84rem;
 }
 
+.task-meta .priority-high {
+    color: #e99aa2;
+}
+
+.task-meta .priority-medium {
+    color: #6ee7a0;
+}
+
+.task-meta .priority-low {
+    color: #b5bbc4;
+}
+
 .task-group-urgent h3 {
     color: #ffb0b0;
 }
@@ -679,6 +691,18 @@ input {
 
 .ai-task-details span {
     margin-right: 15px;
+}
+
+.ai-task-details .priority-high {
+    color: #8b1e2d;
+}
+
+.ai-task-details .priority-medium {
+    color: #14532d;
+}
+
+.ai-task-details .priority-low {
+    color: #4b5563;
 }
 
 .modal-actions {

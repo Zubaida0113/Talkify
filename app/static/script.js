@@ -18,9 +18,13 @@ let extractedTasks = [];
 let currentFilter = "all";
 
 let mediaRecorder;
+let mediaStream;
+let speechRecognition;
 let audioChunks = [];
 let isRecording = false;
 let recordingCancelled = false;
+let transcriptController;
+let uploadController;
 
 const voiceButton = document.getElementById("voiceButton");
 const taskDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -29,8 +33,45 @@ const taskDateFormatter = new Intl.DateTimeFormat("en-US", {
     year: "numeric"
 });
 
-async function startRecording() {
+function getSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    return SpeechRecognition ? new SpeechRecognition() : null;
+}
 
+function resetVoiceButton() {
+    voiceButton.textContent = "🎙️ Record";
+    voiceButton.classList.remove("recording");
+}
+
+async function sendTranscriptToBackend(transcript) {
+    transcriptController = new AbortController();
+    try {
+        const response = await fetch("/audio/transcript", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transcript }),
+            signal: transcriptController.signal
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || "Failed to process transcript.");
+        }
+
+        showAiTasks(result.transcript, result.tasks || []);
+    } catch (error) {
+        if (error.name !== "AbortError") {
+            console.error("Transcript processing failed:", error);
+            alert(error.message);
+        }
+    } finally {
+        transcriptController = null;
+        closeRecordingOverlay();
+        resetVoiceButton();
+    }
+}
+
+async function startRecording() {
     recordingCancelled = false;
     recordingOverlay.hidden = false;
     recordingOverlay.classList.remove("hidden");
@@ -38,11 +79,98 @@ async function startRecording() {
     recordingHint.textContent = "Allow microphone access, then start speaking.";
 
     try {
+        const recognition = getSpeechRecognition();
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true
-        });
+        if (recognition) {
+            speechRecognition = recognition;
+            let transcriptReceived = false;
+            let transcriptSubmitted = false;
 
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event) => {
+                const transcript = Array.from(event.results)
+                    .filter(result => result.isFinal)
+                    .map(result => result[0].transcript)
+                    .join(" ")
+                    .trim();
+
+                if (!transcript || transcriptSubmitted) {
+                    return;
+                }
+
+                transcriptReceived = true;
+                transcriptSubmitted = true;
+                recordingStatus.textContent = "Processing...";
+                recordingHint.textContent = "Turning your speech into tasks.";
+                sendTranscriptToBackend(transcript);
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                recognition.onend = null;
+                speechRecognition = null;
+                isRecording = false;
+
+                if (event.error === "not-allowed") {
+                    closeRecordingOverlay();
+                    resetVoiceButton();
+                    alert("Microphone permission was denied.");
+                    return;
+                }
+
+                recognition.abort();
+                startMediaRecorderFallback();
+            };
+
+            recognition.onend = () => {
+                if (speechRecognition !== recognition) {
+                    return;
+                }
+
+                speechRecognition = null;
+                isRecording = false;
+                resetVoiceButton();
+
+                if (recordingCancelled) {
+                    closeRecordingOverlay();
+                } else if (!transcriptReceived) {
+                    startMediaRecorderFallback();
+                }
+            };
+
+            try {
+                recognition.start();
+                isRecording = true;
+                voiceButton.textContent = "⏹️ Stop";
+                voiceButton.classList.add("recording");
+                return;
+            } catch (error) {
+                console.error("Could not start browser speech recognition:", error);
+                speechRecognition = null;
+            }
+        }
+
+        await startMediaRecorderFallback();
+    } catch (error) {
+        console.error("Microphone error:", error);
+        closeRecordingOverlay();
+        resetVoiceButton();
+        alert("Microphone access is required to record a voice task.");
+    }
+}
+
+async function startMediaRecorderFallback() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (recordingCancelled) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
+
+        mediaStream = stream;
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
@@ -50,106 +178,72 @@ async function startRecording() {
             audioChunks.push(event.data);
         };
 
-
         mediaRecorder.onstop = async () => {
-
-    const audioBlob = new Blob(audioChunks, {
-        type: "audio/webm"
-    });
-
-    console.log("Recording complete");
-    console.log("Audio size:", audioBlob.size);
-
-
-    if (recordingCancelled) {
-        stream.getTracks().forEach(track => track.stop());
-        return;
-    }
-
-    const formData = new FormData();
-
-    formData.append(
-        "file",
-        audioBlob,
-        "voice_task.webm"
-    );
-
-
-    try {
-
-        const response = await fetch("/audio/upload", {
-            method: "POST",
-            body: formData
-        });
-
-
-        const result = await response.json();
-
-        console.log("Server response:", result);
-
-        if (!response.ok) {
-            if (response.status === 422) {
-                throw new Error("I could not hear a clear task. Please record your voice again.");
+            if (recordingCancelled) {
+                stream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                closeRecordingOverlay();
+                return;
             }
-            throw new Error(result.detail || "Failed to process the recording.");
-        }
 
-        showAiTasks(result.transcript, result.tasks || []);
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+            const formData = new FormData();
+            formData.append("file", audioBlob, "voice_task.webm");
+            recordingStatus.textContent = "Processing...";
+            recordingHint.textContent = "Transcribing your recording.";
+            uploadController = new AbortController();
 
+            try {
+                const response = await fetch("/audio/upload", {
+                    method: "POST",
+                    body: formData,
+                    signal: uploadController.signal
+                });
+                const result = await response.json();
 
-    } catch (error) {
+                if (!response.ok) {
+                    if (response.status === 422) {
+                        throw new Error("I could not hear a clear task. Please record your voice again.");
+                    }
+                    throw new Error(result.detail || "Failed to process the recording.");
+                }
 
-        console.error("Audio upload failed:", error);
-        alert(error.message);
-
-    }
-
-
-    stream.getTracks().forEach(
-        track => track.stop()
-    );
-    closeRecordingOverlay();
-};
-
+                showAiTasks(result.transcript, result.tasks || []);
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    console.error("Audio upload failed:", error);
+                    alert(error.message);
+                }
+            } finally {
+                uploadController = null;
+                stream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                closeRecordingOverlay();
+                resetVoiceButton();
+            }
+        };
 
         mediaRecorder.start();
-
         isRecording = true;
         recordingStatus.textContent = "Listening...";
         recordingHint.textContent = "Tap Stop when you finish speaking.";
-
         voiceButton.textContent = "⏹️ Stop";
-
         voiceButton.classList.add("recording");
-
-        console.log("Recording started");
-
     } catch (error) {
-
-        console.error("Microphone error:", error);
-
+        console.error("Microphone fallback error:", error);
         closeRecordingOverlay();
-
-        alert(
-            "Microphone access is required to record a voice task."
-        );
-
+        resetVoiceButton();
+        alert("Microphone access is required to record a voice task.");
     }
 }
 
 function stopRecording() {
-
-    if (mediaRecorder && isRecording) {
-
+    if (speechRecognition && isRecording) {
+        speechRecognition.stop();
+    } else if (mediaRecorder && isRecording) {
         mediaRecorder.stop();
-        closeRecordingOverlay();
-
         isRecording = false;
-
-        voiceButton.textContent = "🎙️ Record";
-
-        voiceButton.classList.remove("recording");
-
+        resetVoiceButton();
     }
 }
 
@@ -160,12 +254,25 @@ function closeRecordingOverlay() {
 
 function cancelRecording() {
     recordingCancelled = true;
+    if (speechRecognition) {
+        speechRecognition.onresult = null;
+        speechRecognition.onerror = null;
+        speechRecognition.onend = null;
+        speechRecognition.abort();
+        speechRecognition = null;
+    }
+    transcriptController?.abort();
+    uploadController?.abort();
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.onstop = null;
         mediaRecorder.stop();
     }
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+    }
     isRecording = false;
-    voiceButton.textContent = "🎙️ Record";
-    voiceButton.classList.remove("recording");
+    resetVoiceButton();
     closeRecordingOverlay();
 }
 
@@ -365,7 +472,7 @@ function renderTasks() {
             : `<span>📅 No deadline</span>`
         }
 
-        <span>
+        <span class="priority-${task.priority || "medium"}">
             ⭐ ${task.priority || "medium"}
         </span>
 
@@ -486,7 +593,7 @@ function showAiTasks(transcript, foundTasks) {
 
                 <div class="ai-task-details">
                     <span>📅 ${task.due_date || "No deadline"}</span>
-                    <span>⭐ ${task.priority || "medium"}</span>
+                    <span class="priority-${task.priority || "medium"}">⭐ ${task.priority || "medium"}</span>
                 </div>
             `;
 
