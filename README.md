@@ -10,7 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-REST_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-Structured_AI-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Speech](https://img.shields.io/badge/Speech-Web_API_%2B_Vosk-168A72)](https://alphacephei.com/vosk/)
-[![Tests](https://img.shields.io/badge/tests-2_passing-2ea44f)](tests/)
+[![Tests](https://img.shields.io/badge/tests-6_passing-2ea44f)](tests/)
 
 <br />
 
@@ -72,18 +72,15 @@ This is a small but complete example of an AI-assisted workflow: unstructured in
 ### Product flow
 
 ```text
-Browser microphone
-        |
-        v
-Web microphone --> Web Speech API --> /audio/transcript --+
-       |                                                  |
-       +--> fallback WebM --> FFmpeg --> Vosk ------------+
-                                                          |
-                                                          v
-                                              Gemini task understanding
-                                                          |
-                                                          v
-Pydantic validation
+Browser microphone --> Web Speech API --> /audio/transcript --+
+       |                                                       |
+       +--> fallback WebM --> FFmpeg --> Vosk -----------------+
+                                                               |
+                                                               v
+                                                   Gemini task understanding
+                                                               |
+                                                               v
+                                                   Pydantic validation
         |
         v
 Human confirmation modal
@@ -231,6 +228,8 @@ Talkify/
 │       ├── index.html          # Dashboard markup
 │       ├── script.js           # Browser interaction and filters
 │       └── style.css           # Dashboard styling
+├── Dockerfile                  # App image, FFmpeg, and Vosk model setup
+├── .dockerignore               # Keep local data and environments out of builds
 ├── tests/
 ├── uploads/                    # Temporary audio files
 ├── requirements.txt
@@ -260,7 +259,7 @@ venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-FFmpeg is required only for the uploaded-audio fallback. Vosk loads its speech model only when that fallback is used. Install FFmpeg and download the small English model:
+For a non-Docker install, FFmpeg is required only for the uploaded-audio fallback. Vosk loads its speech model only when that fallback is used. Install FFmpeg and download the small English model:
 
 ```bash
 # Ubuntu / GitHub Codespaces
@@ -290,14 +289,14 @@ Create a key in [Google AI Studio](https://aistudio.google.com/). Keep `.env` pr
 
 ### Run with Docker
 
-Build the image and run it locally. The image installs FFmpeg and downloads the Vosk model during the build.
+Build the image and run it locally. The image installs FFmpeg and downloads the Vosk model to `models/vosk-model-small-en-us-0.15` during the build, so no separate model download is needed on the host.
 
 ```bash
 docker build -t talkify .
-docker run --rm --name talkify -p 8000:8000 --env-file .env talkify
+docker run --name talkify -p 8000:8000 --env-file .env talkify
 ```
 
-Open `http://localhost:8000`. The container defaults to port `8000`; Render's `PORT` setting overrides it.
+Open `http://localhost:8000`. The container defaults to port `8000`; Render's `PORT` setting overrides it. Stop and restart the container with `docker stop talkify` and `docker start talkify`. SQLite data is stored inside the container and will be lost if the container is removed.
 
 ### 4. Start the application
 
